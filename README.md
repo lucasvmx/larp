@@ -4,7 +4,7 @@
 Shell script to make ARP poisoning a bit easier
 
 ## Usage
-* install packet dsniff: **sudo apt-get -y install dsniff**
+* install packet dsniff: **sudo apt install -y dsniff** or **sudo pacman -S dsniff**
 * run larp: **chmod +x larp && ./larp**
 * use **tcpdump**, **wiresark**, **sslstrip** and similar tools to check network traffic
 
