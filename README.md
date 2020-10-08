@@ -1,18 +1,15 @@
-![license](https://img.shields.io/github/license/mashape/apistatus.svg)
+![license](https://img.shields.io/github/license/lucas-engen/larp?style=for-the-badge)
 
 ## Larp
-Script em shell para realizar um envenenamento ARP com mais rapidez.
+Shell script to make ARP poisoning a bit easier
 
-## Como utilizar
-* Instale o pacote dsniff: **sudo apt-get -y install dsniff**
-* Execute o larp: **chmod +x larp && ./larp**
-* Utilize o **tcpdump**, **wiresark**, **sslstrip**, etc... para verificar o tráfego de rede
+## Usage
+* install packet dsniff: **sudo apt-get -y install dsniff**
+* run larp: **chmod +x larp && ./larp**
+* use **tcpdump**, **wiresark**, **sslstrip** and similar tools to check network traffic
 
-## Sistema operacional alvo
-* Linux - todas as versões
+## Target OS
+* Linux
 
-## Observações
-Não utilize esta ferramenta em organizações militares ou redes de internet públicas. Esta ferramenta foi disponibilizada com o intuito de facilitar o teste de segurança de sua própria rede e de não prejudicar terceiros utilizando hacking.
-
-## Autor
-Lucas Vieira de Jesus - <lucas.engen.cc@gmail.com>
+## Author
+[Lucas Vieira de Jesus](mailto:lucas.engen.cc@gmail.com)
