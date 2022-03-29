@@ -176,8 +176,6 @@ function show_banner()
 	fi
 }
 
-3925
-188023-3
 function show_usage()
 {
 	log_info "Usage: $YELLOW$0$RESET $GREEN$p4$RESET <interface> $GREEN$p1$RESET <ip> $GREEN$p2$RESET <ip> $GREEN$p3$RESET [$GREEN $flag1$RESET |$RED $flag2$RESET]"
